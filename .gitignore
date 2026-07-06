@@ -1,0 +1,22 @@
+# Generated alert images/videos
+script/alerts/
+
+# YOLO training output
+runs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+.venv/
+
+# Database
+*.db
+
+script/alerts/
+
+alerts/
+
+drone_dataset/

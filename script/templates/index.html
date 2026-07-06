@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Drone Surveillance Dashboard</title>
+<script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+<style>
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: #0a0a0f;
+    color: white;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.navbar {
+    background: linear-gradient(90deg, #0d0d1a, #1a0a2e);
+    border-bottom: 1px solid #2a2a4a;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #00b4ff, #0066cc);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.brand-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    letter-spacing: 0.5px;
+}
+
+.brand-sub {
+    font-size: 11px;
+    color: #6688aa;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.navbar-stats {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.stat-pill {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px;
+    color: #aac;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #00ff88;
+    animation: pulse 2s infinite;
+}
+
+.stat-dot.offline {
+    background: #ff4444;
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.add-bar {
+    background: #0f0f1e;
+    border-bottom: 1px solid #1a1a2e;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+}
+
+.add-bar input {
+    flex: 1;
+    
+    min-width: 140px;
+    padding: 9px 16px;
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+    color: white;
+    font-size: 13px;
+    outline: none;
+    transition: border 0.2s;
+}
+
+.add-bar input:focus { border-color: #0088ff; }
+.add-bar input::placeholder { color: #445; }
+
+.btn-add {
+    padding: 9px 20px;
+    background: linear-gradient(135deg, #0066cc, #0044aa);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn-add:hover { opacity: 0.9; transform: scale(1.02); }
+
+#status-msg {
+    font-size: 12px;
+    min-width: 200px;
+    text-align: center;
+}
+
+.main {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 0;
+    height: calc(100vh - 115px);
+    overflow: hidden;
+}
+
+.cam-section {
+    overflow-y: auto;
+    padding: 16px;
+    background: #0a0a0f;
+}
+
+.cam-section::-webkit-scrollbar { width: 5px; }
+.cam-section::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 4px; }
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6688aa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.cam-count {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 11px;
+    color: #6688aa;
+}
+
+.cam-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+
+.camera-card {
+    background: #0f0f1e;
+    border: 1px solid #1e1e3a;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.camera-card:hover { border-color: #3a3a6a; }
+
+.camera-header {
+    padding: 7px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0d0d1e;
+    border-bottom: 1px solid #1a1a2e;
+}
+
+.camera-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #aabbcc;
+    letter-spacing: 0.5px;
+}
+
+.cam-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cam-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: #00ff88;
+}
+
+.cam-status.offline { color: #ff4444; }
+
+.cam-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00ff88;
+    animation: pulse 2s infinite;
+}
+
+.cam-status-dot.offline {
+    background: #ff4444;
+    animation: none;
+}
+
+.btn-delete {
+    background: rgba(255, 60, 60, 0.15);
+    border: 1px solid rgba(255, 60, 60, 0.3);
+    color: #ff6666;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.2s;
+    line-height: 1.4;
+}
+
+.btn-delete:hover {
+    background: rgba(255, 60, 60, 0.3);
+}
+
+.camera-feed {
+    width: 100%;
+    display: block;
+    background: #05050e;
+    min-height: 160px;
+    object-fit: cover;
+}
+
+.sidebar {
+    background: #0d0d1a;
+    border-left: 1px solid #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+}
+
+/* alerts and playback equal height */
+.sidebar-alerts {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-bottom: 1px solid #1a1a2e;
+}
+
+.sidebar-playback {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-title {
+    padding: 12px 16px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6688aa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #1a1a2e;
+    flex-shrink: 0;
+}
+
+.alerts-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px;
+}
+
+.alerts-list::-webkit-scrollbar { width: 4px; }
+.alerts-list::-webkit-scrollbar-thumb { background: #e07b00; border-radius: 4px; }
+
+.alert-card {
+    background: #111122;
+    border: 1px solid #1e1e3a;
+    border-left: 3px solid #e07b00;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    transition: background 0.15s;
+}
+
+.alert-card:hover { background: #151528; }
+.alert-card.entry { border-left-color: #e24b4a; }
+.alert-card.exit  { border-left-color: #639922; }
+.alert-card.hov   { border-left-color: #ba7517; }
+
+.alert-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.alert-badges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.bdg {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.b-cam   { background: #0c447c; color: #b5d4f4; }
+.b-drone { background: #3c3489; color: #cecbf6; }
+.b-entry { background: #791f1f; color: #f7c1c1; }
+.b-exit  { background: #27500a; color: #c0dd97; }
+.b-hov   { background: #633806; color: #fac775; }
+
+.alert-time { font-size: 10px; color: #445566; }
+
+.play-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e07b00;
+    border: none;
+    cursor: pointer;
+    color: white;
+    font-size: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.play-btn:hover { background: #ff9500; transform: scale(1.1); }
+
+.playback-inner {
+    flex: 1;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+}
+
+#player {
+    width: 100%;
+    flex: 1;
+    border-radius: 8px;
+    background: #05050e;
+    border: 1px solid #1a1a2e;
+    min-height: 0;
+}
+
+@media (max-width: 900px) {
+    .main {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+    .sidebar {
+        border-left: none;
+        border-top: 1px solid #1a1a2e;
+        height: auto;
+    }
+    .sidebar-alerts { max-height: 300px; }
+    .sidebar-playback { min-height: 220px; }
+    .navbar-stats { display: none; }
+}
+
+@media (max-width: 600px) {
+    .cam-grid { grid-template-columns: 1fr; }
+    .brand-title { font-size: 14px; }
+}
+
+/* ── VIDEO MODAL ── */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+
+.modal-box {
+    background: #0f0f1e;
+    border: 1px solid #2a2a4a;
+    border-radius: 14px;
+    width: 90%;
+    max-width: 860px;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(0,100,255,0.15);
+    animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+.modal-header {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0d0d1e;
+    border-bottom: 1px solid #1a1a2e;
+}
+.modal-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.modal-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: #791f1f;
+    color: #f7c1c1;
+}
+.modal-close {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(255,60,60,0.15);
+    border: 1px solid rgba(255,60,60,0.3);
+    color: #ff6666;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.modal-close:hover { background: rgba(255,60,60,0.35); }
+#modal-player {
+    width: 100%;
+    max-height: 480px;
+    display: block;
+    background: #000;
+}
+.modal-info-bar {
+    padding: 12px 18px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: #0d0d1e;
+    border-top: 1px solid #1a1a2e;
+}
+.modal-info-item {
+    font-size: 11px;
+    color: #8899aa;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.modal-info-item strong { color: #ccddee; }
+
+.alert-card.detected { border-left-color: #00aaff; }
+.b-detected { background: #0a2a4a; color: #66ccff; }
+
+/* ── ZONE PANEL ── */
+.zone-panel {
+    background: #0d0d1a;
+    border: 1px solid #2a2a4a;
+    border-radius: 10px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.zone-panel-header {
+    background: #0d1220;
+    border-bottom: 1px solid #2a2a4a;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #d48a10;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+.zone-panel-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #e07b00;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+}
+.zone-panel-body {
+    padding: 6px 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.zone-panel-hint {
+    font-size: 10px;
+    color: #445566;
+    white-space: nowrap;
+}
+.zone-panel-controls {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+}
+.zone-select {
+    height: 34px;
+    padding: 0 28px 0 10px;
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+    color: #aabbcc;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%236688aa' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    min-width: 105px;
+    transition: border-color 0.2s;
+}
+.zone-select:focus { border-color: #0088ff; }
+.zone-select option { background: #141428; color: #aabbcc; }
+.btn-draw-zone {
+    height: 34px;
+    padding: 0 12px;
+    background: rgba(224,123,0,0.12);
+    color: #d48a10;
+    border: 1px solid rgba(224,123,0,0.4);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.btn-draw-zone:hover {
+    background: rgba(224,123,0,0.22);
+    border-color: rgba(224,123,0,0.7);
+    color: #ffaa33;
+}
+.btn-draw-zone.active {
+    background: rgba(224,123,0,0.28);
+    border-color: #e07b00;
+    color: #ffaa33;
+    box-shadow: 0 0 0 2px rgba(224,123,0,0.2);
+}
+.btn-save-zone {
+    height: 34px;
+    padding: 0 12px;
+    background: rgba(0,170,100,0.12);
+    color: #00bb77;
+    border: 1px solid rgba(0,170,100,0.4);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.btn-save-zone:hover {
+    background: rgba(0,170,100,0.22);
+    border-color: rgba(0,170,100,0.7);
+    color: #00ee99;
+}
+.polygon-dot{
+    position:absolute;
+    width: 4px;
+    height:4px;
+    background:red;
+    border-radius:50%;
+    z-index:999;
+}
+</style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="navbar-brand">
+        <div class="brand-icon">&#x1F6F0;</div>
+        <div>
+            <div class="brand-title">AI Drone Surveillance</div>
+            <div class="brand-sub">Real-time monitoring system</div>
+        </div>
+    </div>
+    <div class="navbar-stats">
+        <div class="stat-pill" id="server-status-pill">
+            <div class="stat-dot" id="server-dot"></div>
+            <span id="server-status-text">Connecting...</span>
+        </div>
+        <div class="stat-pill">
+            &#x1F4F7; <span id="total-cams">0</span> Cameras
+        </div>
+        <div class="stat-pill">
+            &#x26A0; <span id="total-alerts">0</span> Alerts
+        </div>
+    </div>
+</div>
+
+<div class="add-bar">
+    <input type="text" id="cam-url"
+           placeholder="Enter RTSP or video URL — e.g. rtsp://192.168.1.1/stream" />
+    <button class="btn-add" onclick="addCamera()">+ Add Camera</button>
+    <div id="status-msg"></div>
+
+    <!-- ===========================
+    POLYGON RESTRICTED ZONE
+    CAMERA SELECTION
+    =========================== -->
+    <div class="zone-panel">
+        <div class="zone-panel-header">
+            <div class="zone-panel-dot"></div>
+            &#9632; Restricted Zone Drawing Panel
+        </div>
+        <div class="zone-panel-body">
+            <div class="zone-panel-hint">Select a camera, click <strong style="color:#d48a10;">Draw Zone</strong> and click on the feed to mark boundary points, then click <strong style="color:#00bb77;">Save Zone</strong>.</div>
+            <div class="zone-panel-controls">
+                <select class="zone-select" id="cameraSelect"></select>
+                <button class="btn-draw-zone" id="draw-zone-btn" onclick="startPolygonMode()">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <polygon points="6,1 11,10 1,10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+                    </svg>
+                    Draw Zone
+                </button>
+                <button class="btn-save-zone" onclick="savePolygonZone()">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <polyline points="1.5,6.5 5,10 10.5,2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Save Zone
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+
+    <div class="cam-section">
+        <div class="section-header">
+            <div class="section-title">Live Feeds</div>
+            <div class="cam-count" id="cam-count-badge">0 active</div>
+        </div>
+        <div class="cam-grid" id="camera-grid"></div>
+    </div>
+
+    <div class="sidebar">
+
+        <div class="sidebar-alerts">
+            <div class="sidebar-title">&#x26A0; Alerts</div>
+            <div class="alerts-list" id="alerts"></div>
+        </div>
+
+        <div class="sidebar-playback">
+            <div class="sidebar-title">&#x25B6; Violation Playback</div>
+            <div class="playback-inner">
+                <video id="player" controls></video>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+
+<script>
+// ===========================
+// POLYGON RESTRICTED ZONE
+// ===========================
+
+let polygonMode = false;
+
+let selectedCamera = null;
+
+/* Camera-wise polygon storage */
+let cameraPolygons = {};
+// ── SERVER STATUS ──
+const socket = io();
+let serverOnline = false;
+
+socket.on('connect', function() {
+    serverOnline = true;
+    document.getElementById("server-dot").className = "stat-dot";
+    document.getElementById("server-status-text").innerText = "System Online";
+    // mark all cameras online
+    document.querySelectorAll(".cam-status").forEach(el => {
+        el.className = "cam-status online";
+        el.querySelector(".cam-status-dot").className = "cam-status-dot online";
+        el.querySelector(".cam-live-text").innerText = "LIVE";
+    });
+});
+
+socket.on('disconnect', function() {
+    serverOnline = false;
+    document.getElementById("server-dot").className = "stat-dot offline";
+    document.getElementById("server-status-text").innerText = "Server Offline";
+    // mark all cameras offline
+    document.querySelectorAll(".cam-status").forEach(el => {
+        el.className = "cam-status offline";
+        el.querySelector(".cam-status-dot").className = "cam-status-dot offline";
+        el.querySelector(".cam-live-text").innerText = "OFFLINE";
+    });
+});
+
+
+// ── WEBSOCKET FRAMES ──
+socket.on('video_frame', function(data) {
+    let img = document.getElementById("cam-" + data.cam_id);
+    if (img) img.src = "data:image/jpeg;base64," + data.frame;
+});
+
+
+// ===========================
+// SAVE POLYGON TO SERVER
+// ===========================
+
+function savePolygonZone(){
+    if(
+
+        !cameraPolygons[selectedCamera] ||
+        cameraPolygons[selectedCamera].length < 3
+    ){
+        alert(
+            "Polygon must contain at least 3 points."
+    );
+
+        return;
+    }
+
+
+    fetch('/save_zone',{
+
+        method:'POST',
+
+        headers:{
+            'Content-Type':
+            'application/json'
+        },
+
+        body:JSON.stringify({
+
+            cam_id:selectedCamera,
+
+            points:cameraPolygons[selectedCamera] || []
+
+        })
+
+    })
+    
+    .then(r=>r.json())
+    .then(data=>{
+
+        alert(
+        "Restricted Zone Saved"
+        );
+        document
+        .querySelectorAll('.polygon-dot')
+        .forEach(dot => dot.remove());
+
+        polygonMode=false;
+        
+
+        document.getElementById('draw-zone-btn').classList.remove('active');
+
+    });
+
+}
+// ==========================
+// DRAW RED POINT
+// ==========================
+
+function drawPoint(camId,x,y){
+
+    const card =
+    document.getElementById(
+        `camera-card-${camId}`
+    );
+
+    if(!card) return;
+
+    const dot =
+    document.createElement("div");
+
+    dot.className="polygon-dot";
+
+    dot.style.left = (x-2) + "px";
+
+    dot.style.top = (y+36) + "px";
+
+    card.style.position="relative";
+
+    card.appendChild(dot);
+}
+
+
+
+
+
+
+// ── LOAD CAMERAS ──
+function loadCameras() {
+    fetch('/get_cameras')
+    .then(res => res.json())
+    .then(data => {
+        let select =
+        document.getElementById(
+            'cameraSelect'
+        );
+        if(select){
+
+        
+            select.innerHTML='';
+            let defaultOption =
+        document.createElement('option');
+
+        defaultOption.value = '';
+
+        defaultOption.text =
+            'Select Camera';
+
+        defaultOption.selected = true;
+
+        defaultOption.disabled = true;
+
+        select.appendChild(
+            defaultOption
+        );
+
+
+            data.cameras.forEach(cam=>{
+
+                let option =
+                document.createElement(
+                    'option'
+                );
+
+                option.value = cam.id;
+
+                option.text =
+                "Camera " + (cam.id + 1);
+
+                select.appendChild(option);
+
+            });
+        }    
+
+        let grid = document.getElementById("camera-grid");
+        grid.innerHTML = "";
+
+        let active = 0;
+
+        data.cameras.forEach(cam => {
+
+            let i = cam.id;
+            active++;
+
+            let div = document.createElement("div");
+            div.className = "camera-card";
+            div.id = `camera-card-${i}`;
+
+            div.innerHTML = `
+                <div class="camera-header">
+                    <div class="camera-name">Camera ${i + 1}</div>
+                    <div class="cam-header-right">
+                        <div class="cam-status" id="cam-status-${i}">
+                            <div class="cam-status-dot"></div>
+                            <span class="cam-live-text">LIVE</span>
+                        </div>
+                        <button class="btn-delete" onclick="deleteCamera(${i})">&#x2715; Remove</button>
+                    </div>
+                </div>
+                <img class="camera-feed" id="cam-${i}" />
+            `;
+
+            grid.appendChild(div);
+            let cameraImg=document.getElementById(`cam-${i}`
+
+            );
+            cameraImg.addEventListener('click',function(e){
+                if(!polygonMode)
+                    return;
+                if(selectedCamera !==i){
+                    alert(
+                     "Please draw zone on Camera "
+                     + (selectedCamera + 1)
+                      );
+                      return; }
+
+                const rect = this.getBoundingClientRect();
+
+                const displayX = e.clientX - rect.left;
+                const displayY = e.clientY - rect.top;
+
+                const scaleX = 960 / rect.width;
+                const scaleY = 540 / rect.height;
+
+                const actualX = Math.round(displayX * scaleX);
+                const actualY = Math.round(displayY * scaleY);
+
+                /* Create polygon list for selected camera if not exists */
+
+                if(!(selectedCamera in cameraPolygons)){
+
+                    cameraPolygons[selectedCamera] = [];
+
+                }
+
+                /* Add point only to selected camera */
+
+                cameraPolygons[selectedCamera].push([
+                        actualX,
+                        actualY
+                        ]);
+                drawPoint(i, displayX,displayY)     ;   
+                console.log(cameraPolygons);
+            });
+
+        });
+
+        document.getElementById("total-cams").innerText = active;
+        document.getElementById("cam-count-badge").innerText = active + " active";
+    });
+    
+
+
+}
+
+// ===========================
+// START POLYGON DRAWING
+// ===========================
+
+/*function startPolygonMode(){
+
+    selectedCamera = parseInt(
+        document.getElementById(
+            'cameraSelect'
+        ).value
+    );
+
+    
+
+    polygonMode = true;
+
+    document.getElementById('draw-zone-btn').classList.add('active');
+
+    alert(
+        "Click on the camera feed to place polygon points, then click Save Zone."
+    );
+}
+*/
+function startPolygonMode(){
+
+    // ==========================
+    // CHECK CAMERA SELECTION
+    // ==========================
+
+    const cameraValue =
+    document.getElementById(
+        'cameraSelect'
+    ).value;
+
+    if(cameraValue === ''){
+
+        alert(
+            'Please select a camera first.'
+        );
+
+        return;
+    }
+
+    selectedCamera =
+    parseInt(cameraValue);
+
+    // ==========================
+    // CLEAR OLD POLYGON
+    // ==========================
+
+    cameraPolygons[selectedCamera] = [];
+
+    polygonMode = true;
+
+    document.body.style.cursor =
+        "crosshair";
+
+    document.getElementById(
+        'draw-zone-btn'
+    ).classList.add('active');
+
+    alert(
+        "Draw a new zone for Camera "
+        + (selectedCamera + 1)
+    );
+}
+
+// ── DELETE CAMERA ──
+function deleteCamera(cam_id) {
+
+    if (!confirm(`Remove Camera ${cam_id + 1}?`)) return;
+
+    fetch('/remove_camera', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cam_id: cam_id })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (data.success) {
+
+            // remove from UI
+            let card = document.getElementById(`camera-card-${cam_id}`);
+            if (card) card.remove();
+
+            // update count
+            let remaining = document.querySelectorAll(".camera-card").length;
+            document.getElementById("total-cams").innerText = remaining;
+            document.getElementById("cam-count-badge").innerText = remaining + " active";
+
+        } else {
+            alert("Failed to remove camera");
+        }
+    })
+    .catch(() => {
+        alert("Server error");
+    });
+}
+
+
+// ── ADD CAMERA ──
+function addCamera() {
+    let url       = document.getElementById("cam-url").value.trim();
+    let statusMsg = document.getElementById("status-msg");
+
+    if (!url) {
+        statusMsg.style.color = "#ff6666";
+        statusMsg.innerText   = "Please enter a URL.";
+        return;
+    }
+
+    statusMsg.style.color = "#ffcc00";
+    statusMsg.innerText   = "Adding camera...";
+
+    fetch('/add_camera', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ url: url })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById("cam-url").value = "";
+            statusMsg.style.color = "#00ff88";
+            statusMsg.innerText   = `Camera ${data.cam_id + 1} added successfully!`;
+            loadCameras();
+            setTimeout(() => { statusMsg.innerText = ""; }, 3000);
+        } else {
+            statusMsg.style.color = "#ff6666";
+            statusMsg.innerText   = "Failed: " + (data.message || "Unknown error");
+        }
+    })
+    .catch(() => {
+        statusMsg.style.color = "#ff6666";
+        statusMsg.innerText   = "Connection error — is server running?";
+    });
+}
+
+
+// ── ALERTS ──
+function loadAlerts() {
+    fetch('/alerts')
+    .then(res => res.json())
+    .then(data => {
+        let html  = "";
+        let count = data.events.length;
+
+        data.events.forEach(e => {
+            let type      = e[4];
+            let cardClass = "alert-card";
+            let typeClass = "bdg";
+
+            if (type.includes("Entry")) {
+                cardClass += " entry"; typeClass += " b-entry";
+            } else if (type.includes("Exit")) {
+                cardClass += " exit"; typeClass += " b-exit";
+            } else if (type.includes("Detected")) {
+                cardClass += " detected"; typeClass += " b-detected";
+            } else {
+                cardClass += " hov"; typeClass += " b-hov";
+            }
+
+            let btn = e[5] && e[5] !== "none" && e[5] !== ""
+                ? `<button class="play-btn" onclick="playVideo('${e[5]}','${e[4]}','Cam ${e[2]}','${e[3]}','${e[1]}')">&#9654;</button>`
+                : `<div style="width:28px;flex-shrink:0"></div>`;
+
+            html += `
+                <div class="${cardClass}">
+                    <div class="alert-info">
+                        <div class="alert-badges">
+                            <span class="bdg b-cam">Cam ${e[2]}</span>
+                            <span class="bdg b-drone">Drone_ID ${e[3]}</span>
+                            <span class="${typeClass}">${type}</span>
+                        </div>
+                        <div class="alert-time">${e[1]}</div>
+                    </div>
+                    ${btn}
+                </div>
+            `;
+        });
+
+        document.getElementById("alerts").innerHTML = html;
+        document.getElementById("total-alerts").innerText = count;
+    })
+    .catch(err => console.log("Alerts fetch error:", err));
+}
+
+
+// ── PLAY VIDEO ──
+/*function playVideo(path) {
+    if (!path || path === "none" || path === "") {
+        alert("No video available for this event.");
+        return;
+    }
+    let player = document.getElementById("player");
+    player.src = "/video_play/" + path;
+    player.load();
+    setTimeout(() => {
+        player.play().catch(() => {
+            setTimeout(() => player.play(), 2000);
+        });
+    }, 500);
+    player.scrollIntoView({ behavior: 'smooth' });
+}*/
+// ── PLAY VIDEO — opens modal ──
+function playVideo(path, type, cam, drone, time) {
+    if (!path || path === "none" || path === "") {
+        alert("No video available for this event.");
+        return;
+    }
+    openModal(path, type || "", cam || "", drone || "", time || "");
+}
+
+function openModal(path, type, cam, drone, time) {
+    document.getElementById("modal-cam").innerText   = cam;
+    document.getElementById("modal-drone").innerText = drone;
+    document.getElementById("modal-time").innerText  = time;
+    document.getElementById("modal-type").innerText  = type;
+
+    let badge = document.getElementById("modal-badge");
+    badge.innerText = type;
+    if (type.includes("Entry"))     { badge.style.background="#791f1f"; badge.style.color="#f7c1c1"; }
+    else if (type.includes("Exit")) { badge.style.background="#27500a"; badge.style.color="#c0dd97"; }
+    else                            { badge.style.background="#633806"; badge.style.color="#fac775"; }
+
+    let modalPlayer = document.getElementById("modal-player");
+    modalPlayer.src = "/video_play/" + path;
+    modalPlayer.load();
+
+    // also update sidebar player
+    let sidePlayer = document.getElementById("player");
+    sidePlayer.src = "/video_play/" + path;
+
+    document.getElementById("modal-overlay").classList.add("active");
+    document.body.style.overflow = "hidden";
+
+    setTimeout(() => {
+        modalPlayer.play().catch(() => setTimeout(() => modalPlayer.play(), 2000));
+    }, 400);
+}
+
+function closeModal() {
+    let player = document.getElementById("modal-player");
+    player.pause();
+    player.src = "";
+    document.getElementById("modal-overlay").classList.remove("active");
+    document.body.style.overflow = "";
+}
+
+function handleOverlayClick(e) {
+    if (e.target === document.getElementById("modal-overlay")) closeModal();
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === "Escape") closeModal();
+});
+
+
+// ── INIT ──
+loadCameras();
+setInterval(loadAlerts, 4000);
+
+</script>
+<!-- VIDEO MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+    <div class="modal-box" id="modal-box">
+        <div class="modal-header">
+            <div class="modal-title">
+                &#x1F3A5; Violation Playback
+                <span class="modal-badge" id="modal-badge">Zone Entry</span>
+            </div>
+            <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+        </div>
+        <video id="modal-player" controls autoplay></video>
+        <div class="modal-info-bar">
+            <div class="modal-info-item">&#x1F4F7; <strong id="modal-cam">-</strong></div>
+            <div class="modal-info-item">&#x1F6F0; Drone <strong id="modal-drone">-</strong></div>
+            <div class="modal-info-item">&#x1F4C5; <strong id="modal-time">-</strong></div>
+            <div class="modal-info-item">&#x1F3AF; <strong id="modal-type">-</strong></div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
